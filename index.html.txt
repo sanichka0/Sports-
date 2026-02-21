@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<title>⚡ Спортивна Монополія</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0f0f0f;color:#fff;font-family:system-ui}
+#game{max-width:1100px;margin:auto;padding:10px}
+header{display:flex;justify-content:space-between;align-items:center}
+#announcement{margin:10px 0;padding:8px;background:#222;border-radius:6px;text-align:center}
+#board{display:flex;flex-direction:column;align-items:center;gap:6px}
+.row{display:flex;gap:6px}
+.row.reverse{flex-direction:row-reverse}
+.column{display:flex}
+.column.left{align-self:flex-start}
+.column.right{align-self:flex-end}
+.cell{
+  width:64px;height:64px;border-radius:10px;
+  background:#333;display:flex;justify-content:center;
+  align-items:center;font-weight:bold;position:relative
+}
+.start,.finish{background:#f4c430;color:#000}
+.turn{background:#4cc9f0}
+.back{background:#ef476f}
+.extra{background:#ffd166;color:#000}
+.skip{background:#6c757d}
+.rest{background:#2ec4b6}
+.token{
+  width:18px;height:18px;border-radius:50%;
+  position:absolute;bottom:4px;right:4px
+}
+#bottom{display:flex;justify-content:space-between;margin-top:15px}
+#players{font-size:14px}
+#dice{text-align:center}
+#cube{font-size:48px}
+button{padding:8px 14px;font-size:14px;cursor:pointer}
+#modal{
+  position:fixed;inset:0;background:#000a;
+  display:none;justify-content:center;align-items:center
+}
+#modalContent{
+  background:#222;padding:20px;border-radius:10px;
+  max-width:300px;text-align:center
+}
+</style>
+</head>
+
+<body>
+<div id="game">
+
+<header>
+  <h1>⚡ Спортивна Монополія</h1>
+  <button onclick="toggleRules()">Правила</button>
+</header>
+
+<div id="announcement"></div>
+
+<div id="board">
+  <div class="row">
+    <div class="cell start">1</div><div class="cell">2</div><div class="cell">3</div>
+    <div class="cell">4</div><div class="cell back">5</div><div class="cell">6</div>
+    <div class="cell">7</div><div class="cell rest">8</div><div class="cell extra">9</div>
+    <div class="cell skip">10</div><div class="cell">11</div>
+  </div>
+  <div class="column right"><div class="cell turn">12</div></div>
+  <div class="row reverse">
+    <div class="cell">21</div><div class="cell">20</div><div class="cell">19</div>
+    <div class="cell back">18</div><div class="cell">17</div><div class="cell">16</div>
+    <div class="cell">15</div><div class="cell">14</div><div class="cell back">13</div>
+  </div>
+  <div class="column left"><div class="cell turn">22</div></div>
+  <div class="row">
+    <div class="cell">23</div><div class="cell rest">24</div><div class="cell skip">25</div>
+    <div class="cell">26</div><div class="cell back">27</div><div class="cell">28</div>
+    <div class="cell">29</div><div class="cell">30</div><div class="cell">31</div>
+    <div class="cell finish">32</div>
+  </div>
+</div>
+
+<div id="bottom">
+  <div id="players"></div>
+  <div id="dice">
+    <div id="cube">🎲</div>
+    <button onclick="roll()">КИНУТИ</button>
+  </div>
+</div>
+
+</div>
+
+<div id="modal">
+  <div id="modalContent">
+    <h3 id="modalTitle"></h3>
+    <p id="modalText"></p>
+    <button onclick="closeModal()">OK</button>
+  </div>
+</div>
+
+<script>
+const cells={
+2:["Присідання",7,"s"],3:["Віджимання",6,"p"],4:["Кенгурчики",8,"j"],
+5:["Назад 3",-3],6:["Берпі",5,"b"],7:["Жабка",6,"f"],
+9:["Ще хід"],10:["Пропуск"],11:["Присідання",9,"s"],
+12:["Віджимання",7,"p"],13:["Назад 5",-5],
+14:["Берпі",5,"b"],15:["Кенгурчики",5,"j"],16:["Жабка",7,"f"],
+17:["Присідання",5,"s"],18:["Назад 3",-3],
+19:["Віджимання",10,"p"],20:["Кенгурчики",6,"j"],
+21:["Берпі",7,"b"],22:["Ще хід"],23:["Жабка",8,"f"],
+25:["Пропуск"],26:["Кенгурчики",10,"j"],27:["Назад 5",-5],
+28:["Віджимання",5,"p"],29:["Жабка",9,"f"],
+30:["Присідання",6,"s"],31:["Берпі",6,"b"]
+};
+
+let players=[
+ {name:"Гравець 1",pos:1,skip:false,stats:{s:0,p:0,b:0,j:0,f:0},color:"red"},
+ {name:"Гравець 2",pos:1,skip:false,stats:{s:0,p:0,b:0,j:0,f:0},color:"blue"}
+];
+let turn=0;
+
+function roll(){
+ let p=players[turn];
+ if(p.skip){p.skip=false;next();return}
+ let d=Math.floor(Math.random()*6)+1;
+ p.pos=Math.min(32,p.pos+d);
+ handleCell(p);
+ draw();
+}
+
+function handleCell(p){
+ let c=cells[p.pos];
+ if(!c){if(p.pos===32)win(p);next();return}
+ if(c[0]==="Назад 3"||c[0]==="Назад 5"){p.pos=Math.max(1,p.pos+c[1]);show(c[0])}
+ else if(c[0]==="Ще хід"){show("Ще хід");return}
+ else if(c[0]==="Пропуск"){p.skip=true;show("Пропуск")}
+ else{
+  p.stats[c[2]]+=c[1];
+  show(c[0]+": "+c[1]);
+ }
+ next();
+}
+
+function next(){turn=(turn+1)%players.length}
+function win(p){show("🏆 Перемога!",p.name)}
+function show(t,x=""){document.getElementById("modalTitle").innerText=t;
+ document.getElementById("modalText").innerText=x;
+ document.getElementById("modal").style.display="flex"}
+function closeModal(){document.getElementById("modal").style.display="none"}
+
+function draw(){
+ document.getElementById("announcement").innerText="Хід: "+players[turn].name;
+ document.querySelectorAll(".token").forEach(e=>e.remove());
+ document.querySelectorAll(".cell").forEach((c,i)=>{
+  players.forEach(p=>{
+   if(p.pos===i+1){
+    let t=document.createElement("div");
+    t.className="token";t.style.background=p.color;
+    c.appendChild(t);
+   }
+  });
+ });
+ let list="";
+ players.forEach(p=>{
+  list+=`${p.name}: 🏋️${p.stats.s} 💪${p.stats.p} 🔥${p.stats.b} 🦘${p.stats.j} 🐸${p.stats.f}<br>`;
+ });
+ document.getElementById("players").innerHTML=list;
+}
+draw();
+</script>
+</body>
+</html>
